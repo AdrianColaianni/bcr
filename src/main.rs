@@ -49,6 +49,14 @@ enum BiOp {
     // PreDec,
     // PostInc,
     // PostDec,
+    // Relational Operators
+    Eq, // ==
+    Ne, // !=
+    Gt, // >
+    Ge, // >=
+    Lt, // <
+    Le, // <=
+    // Regular Operators
     Sub, // -
     Add, // +
     Mod, // %
@@ -63,12 +71,18 @@ impl std::fmt::Display for BiOp {
             f,
             "{}",
             match self {
-                BiOp::Sub => '-',
-                BiOp::Add => '+',
-                BiOp::Mod => '%',
-                BiOp::Div => '/',
-                BiOp::Mul => '*',
-                BiOp::Pow => '^',
+                Self::Eq => "==",
+                Self::Ne => "!=",
+                Self::Gt => ">",
+                Self::Ge => ">=",
+                Self::Lt => "<",
+                Self::Le => "<=",
+                Self::Sub => "-",
+                Self::Add => "+",
+                Self::Mod => "%",
+                Self::Div => "/",
+                Self::Mul => "*",
+                Self::Pow => "^",
             }
         )
     }
@@ -90,16 +104,24 @@ fn parse_input(input: &[char]) -> Option<Thing> {
     let mut right: Option<Thing> = None;
 
     loop {
+        if op.is_some() && is_op(input[i]) {
+            println!(
+                "Invalid operator '{}' after '{}'",
+                input[i],
+                op.as_ref().unwrap()
+            );
+            return None;
+        }
         match input[i] {
             '0'..'9' => {
                 let mut num: String = input[i].into();
-                if let Some(mut n) = input.get(i+1) {
+                if let Some(mut n) = input.get(i + 1) {
                     while *n >= '0' && *n <= '9' || *n == '.' {
                         num.push(*n);
                         i += 1;
-                        n = match input.get(i+1) {
+                        n = match input.get(i + 1) {
                             Some(n) => n,
-                            None => break
+                            None => break,
                         };
                     }
                 }
@@ -121,7 +143,7 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 }
             }
             '+' => {
-                if input.get(i+1).is_some_and(|n| *n == '+') {
+                if input.get(i + 1).is_some_and(|n| *n == '+') {
                     todo!("Pre/Postfix addition");
                     // i += 1;
                 } else {
@@ -132,7 +154,7 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 if op.is_some() || (left.is_none() && root.is_none()) {
                     todo!("Negation");
                 } else {
-                    if input.get(i+1).is_some_and(|n| *n == '-') {
+                    if input.get(i + 1).is_some_and(|n| *n == '-') {
                         todo!("Pre/Postfix subtraction");
                         // i += 1;
                     } else {
@@ -140,34 +162,10 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                     }
                 }
             }
-            '/' => {
-                if let Some(op) = &op {
-                    println!("Invalid operand '/' after '{}'", op);
-                    return None;
-                }
-                op = Some(BiOp::Div);
-            }
-            '*' => {
-                if let Some(op) = &op {
-                    println!("Invalid operand '*' after '{}'", op);
-                    return None;
-                }
-                op = Some(BiOp::Mul);
-            }
-            '%' => {
-                if let Some(op) = &op {
-                    println!("Invalid operand '%' after '{}'", op);
-                    return None;
-                }
-                op = Some(BiOp::Mod);
-            }
-            '^' => {
-                if let Some(op) = &op {
-                    println!("Invalid operand '^' after '{}'", op);
-                    return None;
-                }
-                op = Some(BiOp::Pow);
-            }
+            '/' => op = Some(BiOp::Div),
+            '*' => op = Some(BiOp::Mul),
+            '%' => op = Some(BiOp::Mod),
+            '^' => op = Some(BiOp::Pow),
             '(' => {
                 let mut end = i;
                 for (pi, c) in input[end..].iter().enumerate() {
@@ -181,7 +179,7 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                     return None;
                 }
 
-                let rec = &input[i+1..end];
+                let rec = &input[i + 1..end];
 
                 if left.is_none() {
                     println!("Recusing on {:?}", rec);
@@ -195,10 +193,38 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 i = end;
             }
             ')' => (),
-            '<' => todo!(),
-            '>' => todo!(),
-            '=' => todo!(),
-            '!' => todo!(),
+            '<' => {
+                if input.get(i+1).is_some_and(|n| *n == '=') {
+                    op = Some(BiOp::Le);
+                    i += 1;
+                } else {
+                    op = Some(BiOp::Lt);
+                }
+            }
+            '>' => {
+                if input.get(i+1).is_some_and(|n| *n == '=') {
+                    op = Some(BiOp::Ge);
+                    i += 1;
+                } else {
+                    op = Some(BiOp::Gt);
+                }
+            }
+            '=' => {
+                if input.get(i+1).is_some_and(|n| *n == '=') {
+                    op = Some(BiOp::Eq);
+                    i += 1;
+                } else {
+                    todo!("Variable assignment");
+                }
+            }
+            '!' => {
+                if input.get(i+1).is_some_and(|n| *n == '=') {
+                    op = Some(BiOp::Ne);
+                    i += 1;
+                } else {
+                    todo!("Boolean not");
+                }
+            }
             '&' => todo!(),
             '|' => todo!(),
             '\n' => (),
@@ -265,9 +291,19 @@ fn add_ops(root: Option<Thing>, left: Option<Thing>, op: BiOp, right: Thing) -> 
     }
 }
 
+fn is_op(op: char) -> bool {
+    "|&!+-*/%^<>=".contains(op)
+}
+
 fn eval(op: Thing) -> Float {
     match op {
         Thing::BiOp(l, o, r) => match o {
+            BiOp::Eq => Float::with_val(PRECISION, (eval(*l) == eval(*r)) as usize),
+            BiOp::Ne => Float::with_val(PRECISION, (eval(*l) != eval(*r)) as usize),
+            BiOp::Gt => Float::with_val(PRECISION, (eval(*l) > eval(*r)) as usize),
+            BiOp::Ge => Float::with_val(PRECISION, (eval(*l) >= eval(*r)) as usize),
+            BiOp::Lt => Float::with_val(PRECISION, (eval(*l) < eval(*r)) as usize),
+            BiOp::Le => Float::with_val(PRECISION, (eval(*l) <= eval(*r)) as usize),
             BiOp::Add => eval(*l) + eval(*r),
             BiOp::Sub => eval(*l) - eval(*r),
             BiOp::Mul => eval(*l) * eval(*r),
@@ -276,8 +312,8 @@ fn eval(op: Thing) -> Float {
                 let l = eval(*l);
                 let r = eval(*r);
 
-                l.clone() - ( l / r.clone() ) * r
-            },
+                l.clone() - (l / r.clone()) * r
+            }
             BiOp::Pow => eval(*l).pow(eval(*r)),
         },
         Thing::UnOp(o, v) => match o {
