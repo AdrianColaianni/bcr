@@ -50,12 +50,14 @@ enum BiOp {
     // PostInc,
     // PostDec,
     // Relational Operators
-    Eq, // ==
-    Ne, // !=
-    Gt, // >
-    Ge, // >=
-    Lt, // <
-    Le, // <=
+    Eq,  // ==
+    Ne,  // !=
+    Gt,  // >
+    Ge,  // >=
+    Lt,  // <
+    Le,  // <=
+    And, // &&
+    Or,  // ||
     // Regular Operators
     Sub, // -
     Add, // +
@@ -77,6 +79,8 @@ impl std::fmt::Display for BiOp {
                 Self::Ge => ">=",
                 Self::Lt => "<",
                 Self::Le => "<=",
+                Self::And => "&&",
+                Self::Or => "||",
                 Self::Sub => "-",
                 Self::Add => "+",
                 Self::Mod => "%",
@@ -92,6 +96,7 @@ impl std::fmt::Display for BiOp {
 #[allow(dead_code)]
 enum UnOp {
     Neg, // -
+    Not, // !
 }
 
 fn parse_input(input: &[char]) -> Option<Thing> {
@@ -257,11 +262,27 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                     op = Some(BiOp::Ne);
                     i += 1;
                 } else {
-                    todo!("Boolean not");
+                    unop = Some(UnOp::Not)
                 }
             }
-            '&' => todo!(),
-            '|' => todo!(),
+            '&' => {
+                if input.get(i + 1).is_some_and(|n| *n == '&') {
+                    op = Some(BiOp::And);
+                    i += 1;
+                } else {
+                    println!("Invalid '&'");
+                    return None;
+                }
+            }
+            '|' => {
+                if input.get(i + 1).is_some_and(|n| *n == '|') {
+                    op = Some(BiOp::Or);
+                    i += 1;
+                } else {
+                    println!("Invalid '|'");
+                    return None;
+                }
+            }
             '\n' => (),
             ';' => (),
             ' ' => (),
@@ -327,32 +348,36 @@ fn add_ops(root: Option<Thing>, left: Option<Thing>, op: BiOp, right: Thing) -> 
 }
 
 fn is_biop(op: char) -> bool {
-    "|&+*/%^<>=".contains(op)
+    "+*/%^<>=".contains(op)
 }
 
 fn eval(op: Thing) -> Float {
     match op {
-        Thing::BiOp(l, o, r) => match o {
-            BiOp::Eq => Float::with_val(PRECISION, (eval(*l) == eval(*r)) as usize),
-            BiOp::Ne => Float::with_val(PRECISION, (eval(*l) != eval(*r)) as usize),
-            BiOp::Gt => Float::with_val(PRECISION, (eval(*l) > eval(*r)) as usize),
-            BiOp::Ge => Float::with_val(PRECISION, (eval(*l) >= eval(*r)) as usize),
-            BiOp::Lt => Float::with_val(PRECISION, (eval(*l) < eval(*r)) as usize),
-            BiOp::Le => Float::with_val(PRECISION, (eval(*l) <= eval(*r)) as usize),
-            BiOp::Add => eval(*l) + eval(*r),
-            BiOp::Sub => eval(*l) - eval(*r),
-            BiOp::Mul => eval(*l) * eval(*r),
-            BiOp::Div => eval(*l) / eval(*r),
-            BiOp::Mod => {
-                let l = eval(*l);
-                let r = eval(*r);
-
-                l.clone() - (l / r.clone()) * r
-            }
-            BiOp::Pow => eval(*l).pow(eval(*r)),
+        Thing::BiOp(l, o, r) => {
+            let l = eval(*l);
+            let r = eval(*r);
+            match o {
+                BiOp::Eq => Float::with_val(PRECISION, (l == r) as usize),
+                BiOp::Ne => Float::with_val(PRECISION, (l != r) as usize),
+                BiOp::Gt => Float::with_val(PRECISION, (l > r) as usize),
+                BiOp::Ge => Float::with_val(PRECISION, (l >= r) as usize),
+                BiOp::Lt => Float::with_val(PRECISION, (l < r) as usize),
+                BiOp::Le => Float::with_val(PRECISION, (l <= r) as usize),
+                BiOp::And => Float::with_val(PRECISION, (l != 0 && r != 0) as usize),
+                BiOp::Or => Float::with_val(PRECISION, (l != 0 || r != 0) as usize),
+                BiOp::Add => l + r,
+                BiOp::Sub => l - r,
+                BiOp::Mul => l * r,
+                BiOp::Div => l / r,
+                BiOp::Mod => {
+                    l.clone() - (l / r.clone()) * r
+                }
+                BiOp::Pow => l.pow(r),
+                }
         },
         Thing::UnOp(o, v) => match o {
             UnOp::Neg => -eval(*v),
+            UnOp::Not => Float::with_val(PRECISION, (eval(*v) == 0) as usize),
         },
         Thing::Operand(v) => v,
     }
