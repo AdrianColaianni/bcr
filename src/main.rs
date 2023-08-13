@@ -1,4 +1,6 @@
 #![feature(exclusive_range_pattern)]
+mod tests;
+
 use rug::{ops::Pow, Float};
 
 const PRECISION: u32 = 20;
@@ -7,9 +9,16 @@ fn main() {
     println!("{}", BiOp::Mul > BiOp::Add);
     loop {
         (|| {
-            let ops = read_input()?;
+            let stdin = std::io::stdin();
+            let mut buffer = String::new();
+
+            stdin.read_line(&mut buffer).ok()?;
+            let buffer: Vec<char> = buffer.chars().collect();
+
+            let ops = parse_input(&buffer[..]);
             println!("Final: {:?}", ops);
-            let res = eval(ops);
+
+            let res = eval(ops?);
             println!("Final res: {}", res);
             Some(res)
         })();
@@ -19,6 +28,7 @@ fn main() {
 #[derive(Debug, PartialEq)]
 enum Thing {
     BiOp(Box<Thing>, BiOp, Box<Thing>),
+    #[allow(dead_code)]
     UnOp(UnOp, Box<Thing>),
     Operand(Float),
 }
@@ -66,77 +76,68 @@ impl std::fmt::Display for BiOp {
 }
 
 #[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 enum UnOp {
     Neg, // -
 }
 
-fn read_input() -> Option<Thing> {
-    let stdin = std::io::stdin();
-    let mut buffer = String::new();
-
-    stdin.read_line(&mut buffer).unwrap();
-
-    let mut buffer = buffer.chars().into_iter();
-    let mut c = buffer.next()?;
+fn parse_input(input: &[char]) -> Option<Thing> {
+    let mut i = 0;
 
     let mut root: Option<Thing> = None;
 
-    let mut left: Option<Float> = None;
+    let mut left: Option<Thing> = None;
     let mut op: Option<BiOp> = None;
-    let mut right: Option<Float> = None;
+    let mut right: Option<Thing> = None;
 
     loop {
-        if left.is_some() && op.is_some() && right.is_some() {
-            let left = left.take().unwrap();
-            let op = op.take().unwrap();
-            let right = right.take().unwrap();
-
-            root = Some(add_ops(root, Some(left), op, right));
-        } else if root.is_some() && op.is_some() && left.is_some() {
-            let left = left.take().unwrap();
-            let op = op.take().unwrap();
-
-            root = Some(add_ops(root, None, op, left));
-        }
-
-        match c {
+        match input[i] {
             '0'..'9' => {
-                let mut thing = String::new();
-                while c >= '0' && c <= '9' {
-                    thing.push(c);
-                    c = buffer.next()?;
+                let mut num: String = input[i].into();
+                if let Some(mut n) = input.get(i+1) {
+                    while *n >= '0' && *n <= '9' || *n == '.' {
+                        num.push(*n);
+                        i += 1;
+                        n = match input.get(i+1) {
+                            Some(n) => n,
+                            None => break
+                        };
+                    }
                 }
 
                 if left.is_none() {
-                    left = Some(Float::with_val(PRECISION, Float::parse(thing).unwrap()));
+                    left = Some(Thing::Operand(Float::with_val(
+                        PRECISION,
+                        Float::parse(num).unwrap(),
+                    )));
                     // println!("Found {}", left.as_ref().unwrap());
                 } else if right.is_none() {
-                    right = Some(Float::with_val(PRECISION, Float::parse(thing).unwrap()));
+                    right = Some(Thing::Operand(Float::with_val(
+                        PRECISION,
+                        Float::parse(num).unwrap(),
+                    )));
                     // println!("Found {}", right.as_ref().unwrap());
                 } else {
-                    panic!("Invalid input: {}", thing);
+                    panic!("Invalid input: {}", num);
                 }
-                continue;
             }
             '+' => {
-                c = buffer.next()?;
-                if c == '+' {
+                if input.get(i+1).is_some_and(|n| *n == '+') {
                     todo!("Pre/Postfix addition");
+                    // i += 1;
                 } else {
                     op = Some(BiOp::Add);
-                    continue;
                 }
             }
             '-' => {
                 if op.is_some() || (left.is_none() && root.is_none()) {
                     todo!("Negation");
                 } else {
-                    c = buffer.next()?;
-                    if c == '-' {
+                    if input.get(i+1).is_some_and(|n| *n == '-') {
                         todo!("Pre/Postfix subtraction");
+                        // i += 1;
                     } else {
                         op = Some(BiOp::Sub);
-                        continue;
                     }
                 }
             }
@@ -168,52 +169,91 @@ fn read_input() -> Option<Thing> {
                 }
                 op = Some(BiOp::Pow);
             }
-            '(' => todo!(),
-            ')' => todo!(),
+            '(' => {
+                let mut end = i;
+                while input.get(end).is_some_and(|n| *n != ')') {
+                    end += 1;
+                }
+
+                let rec = &input[i+1..end];
+
+                if left.is_none() {
+                    println!("Recusing on {:?}", rec);
+                    left = Some(parse_input(rec).unwrap());
+                } else if right.is_none() {
+                    println!("Recusing on {:?}", rec);
+                    right = Some(parse_input(rec).unwrap());
+                } else {
+                    panic!("Invalid input at {}", i);
+                }
+                i = end;
+            }
+            ')' => (),
             '<' => todo!(),
             '>' => todo!(),
             '=' => todo!(),
             '!' => todo!(),
             '&' => todo!(),
             '|' => todo!(),
-            '\n' => return root,
+            '\n' => (),
+            ';' => (),
             ' ' => (),
             c => todo!("Encountered unknown {}", c),
         }
-        c = buffer.next()?;
+
+        println!("{:?} - {:?} - {:?}", left, op, right);
+
+        if left.is_some() && op.is_some() && right.is_some() {
+            let left = left.take().unwrap();
+            let op = op.take().unwrap();
+            let right = right.take().unwrap();
+
+            root = Some(add_ops(root, Some(left), op, right));
+            println!("Built new op: {:?}", root);
+        } else if root.is_some() && op.is_some() && left.is_some() {
+            let left = left.take().unwrap();
+            let op = op.take().unwrap();
+
+            root = Some(add_ops(root, None, op, left));
+            println!("Built new op: {:?}", root);
+        }
+
+        i += 1;
+        if i == input.len() {
+            println!("Goodby");
+            return if root.is_some() {
+                root
+            } else if left.is_some() {
+                left
+            } else {
+                right
+            };
+        }
     }
 }
 
-fn add_ops(root: Option<Thing>, left: Option<Float>, op: BiOp, right: Float) -> Thing {
+fn add_ops(root: Option<Thing>, left: Option<Thing>, op: BiOp, right: Thing) -> Thing {
+    // If root and left are both some, there is nowhere to put the new Thing, but if both are none
+    // there is not enough to build a new Thing
+    assert_ne!(root.is_some(), left.is_some());
+
     if let Some(root) = root {
         // todo!("Tricky bit of determining operator precedence");
         match root {
             Thing::BiOp(l, o, r) => {
                 if o >= op {
                     // root operator has higher precedence than our operator
-                    Thing::BiOp(
-                        Box::new(Thing::BiOp(l, o, r)),
-                        op,
-                        Box::new(Thing::Operand(right)),
-                    )
+                    Thing::BiOp(Box::new(Thing::BiOp(l, o, r)), op, Box::new(right))
                 } else {
                     // root operator has lower precedence than our operator
-                    Thing::BiOp(
-                        l,
-                        o,
-                        Box::new(Thing::BiOp(r, op, Box::new(Thing::Operand(right)))),
-                    )
+                    Thing::BiOp(l, o, Box::new(Thing::BiOp(r, op, Box::new(right))))
                 }
             }
-            Thing::UnOp(o, v) => todo!(),
-            Thing::Operand(v) => panic!("What the funk"),
+            Thing::UnOp(..) => todo!(),
+            Thing::Operand(_) => panic!("What the funk"),
         }
     } else if let Some(left) = left {
-        Thing::BiOp(
-            Box::new(Thing::Operand(left)),
-            op,
-            Box::new(Thing::Operand(right)),
-        )
+        Thing::BiOp(Box::new(left), op, Box::new(right))
     } else {
         panic!("Bruv");
     }
@@ -226,7 +266,12 @@ fn eval(op: Thing) -> Float {
             BiOp::Sub => eval(*l) - eval(*r),
             BiOp::Mul => eval(*l) * eval(*r),
             BiOp::Div => eval(*l) / eval(*r),
-            BiOp::Mod => eval(*l) % eval(*r),
+            BiOp::Mod => {
+                let l = eval(*l);
+                let r = eval(*r);
+
+                l.clone() - ( l / r.clone() ) * r
+            },
             BiOp::Pow => eval(*l).pow(eval(*r)),
         },
         Thing::UnOp(o, v) => match o {
