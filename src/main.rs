@@ -45,10 +45,8 @@ enum Thing {
 //   ++ and -- operators, nonassociative
 #[derive(Debug, PartialEq, PartialOrd)]
 enum BiOp {
-    // PreInc,
-    // PreDec,
-    // PostInc,
-    // PostDec,
+    Or,  // ||
+    And, // &&
     // Relational Operators
     Eq,  // ==
     Ne,  // !=
@@ -56,15 +54,17 @@ enum BiOp {
     Ge,  // >=
     Lt,  // <
     Le,  // <=
-    And, // &&
-    Or,  // ||
     // Regular Operators
-    Sub, // -
     Add, // +
-    Mod, // %
-    Div, // /
+    Sub, // -
     Mul, // *
+    Div, // /
+    Mod, // %
     Pow, // ^
+    // PreInc,
+    // PreDec,
+    // PostInc,
+    // PostDec,
 }
 
 impl std::fmt::Display for BiOp {
@@ -92,11 +92,14 @@ impl std::fmt::Display for BiOp {
     }
 }
 
+// Lowest to highest expression precedence
+//   ! operator, nonassociative
+//   unary - operator, nonassociative
 #[derive(Debug, PartialEq)]
 #[allow(dead_code)]
 enum UnOp {
-    Neg, // -
     Not, // !
+    Neg, // -
 }
 
 fn parse_input(input: &[char]) -> Option<Thing> {
