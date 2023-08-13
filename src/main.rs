@@ -101,10 +101,11 @@ fn parse_input(input: &[char]) -> Option<Thing> {
 
     let mut left: Option<Thing> = None;
     let mut op: Option<BiOp> = None;
+    let mut unop: Option<UnOp> = None;
     let mut right: Option<Thing> = None;
 
     loop {
-        if op.is_some() && is_op(input[i]) {
+        if op.is_some() && is_biop(input[i]) {
             println!(
                 "Invalid operator '{}' after '{}'",
                 input[i],
@@ -127,16 +128,36 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 }
 
                 if left.is_none() {
-                    left = Some(Thing::Operand(Float::with_val(
-                        PRECISION,
-                        Float::parse(num).unwrap(),
-                    )));
+                    if unop.is_some() {
+                        left = Some(Thing::UnOp(
+                            unop.take().unwrap(),
+                            Box::new(Thing::Operand(Float::with_val(
+                                PRECISION,
+                                Float::parse(num).unwrap(),
+                            ))),
+                        ));
+                    } else {
+                        left = Some(Thing::Operand(Float::with_val(
+                            PRECISION,
+                            Float::parse(num).unwrap(),
+                        )));
+                    }
                     // println!("Found {}", left.as_ref().unwrap());
                 } else if right.is_none() {
-                    right = Some(Thing::Operand(Float::with_val(
-                        PRECISION,
-                        Float::parse(num).unwrap(),
-                    )));
+                    if unop.is_some() {
+                        right = Some(Thing::UnOp(
+                            unop.take().unwrap(),
+                            Box::new(Thing::Operand(Float::with_val(
+                                PRECISION,
+                                Float::parse(num).unwrap(),
+                            ))),
+                        ));
+                    } else {
+                        right = Some(Thing::Operand(Float::with_val(
+                            PRECISION,
+                            Float::parse(num).unwrap(),
+                        )));
+                    }
                     // println!("Found {}", right.as_ref().unwrap());
                 } else {
                     panic!("Invalid input: {}", num);
@@ -152,7 +173,8 @@ fn parse_input(input: &[char]) -> Option<Thing> {
             }
             '-' => {
                 if op.is_some() || (left.is_none() && root.is_none()) {
-                    todo!("Negation");
+                    // todo!("Negation");
+                    unop = Some(UnOp::Neg);
                 } else {
                     if input.get(i + 1).is_some_and(|n| *n == '-') {
                         todo!("Pre/Postfix subtraction");
@@ -180,21 +202,34 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 }
 
                 let rec = &input[i + 1..end];
+                println!("Recusing on {:?}", rec);
 
                 if left.is_none() {
-                    println!("Recusing on {:?}", rec);
-                    left = Some(parse_input(rec).unwrap());
+                    if unop.is_some() {
+                        left = Some(Thing::UnOp(
+                            unop.take().unwrap(),
+                            Box::new(parse_input(rec).unwrap()),
+                        ));
+                    } else {
+                        left = Some(parse_input(rec).unwrap());
+                    }
                 } else if right.is_none() {
-                    println!("Recusing on {:?}", rec);
-                    right = Some(parse_input(rec).unwrap());
+                    if unop.is_some() {
+                        right = Some(Thing::UnOp(
+                            unop.take().unwrap(),
+                            Box::new(parse_input(rec).unwrap()),
+                        ));
+                    } else {
+                        right = Some(parse_input(rec).unwrap());
+                    }
                 } else {
-                    panic!("Invalid input at {}", i);
+                    panic!("Invalid input 1:{}", i);
                 }
                 i = end;
             }
             ')' => (),
             '<' => {
-                if input.get(i+1).is_some_and(|n| *n == '=') {
+                if input.get(i + 1).is_some_and(|n| *n == '=') {
                     op = Some(BiOp::Le);
                     i += 1;
                 } else {
@@ -202,7 +237,7 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 }
             }
             '>' => {
-                if input.get(i+1).is_some_and(|n| *n == '=') {
+                if input.get(i + 1).is_some_and(|n| *n == '=') {
                     op = Some(BiOp::Ge);
                     i += 1;
                 } else {
@@ -210,7 +245,7 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 }
             }
             '=' => {
-                if input.get(i+1).is_some_and(|n| *n == '=') {
+                if input.get(i + 1).is_some_and(|n| *n == '=') {
                     op = Some(BiOp::Eq);
                     i += 1;
                 } else {
@@ -218,7 +253,7 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                 }
             }
             '!' => {
-                if input.get(i+1).is_some_and(|n| *n == '=') {
+                if input.get(i + 1).is_some_and(|n| *n == '=') {
                     op = Some(BiOp::Ne);
                     i += 1;
                 } else {
@@ -291,8 +326,8 @@ fn add_ops(root: Option<Thing>, left: Option<Thing>, op: BiOp, right: Thing) -> 
     }
 }
 
-fn is_op(op: char) -> bool {
-    "|&!+-*/%^<>=".contains(op)
+fn is_biop(op: char) -> bool {
+    "|&+*/%^<>=".contains(op)
 }
 
 fn eval(op: Thing) -> Float {

@@ -7,17 +7,17 @@ mod tests {
     #[test]
     fn order_of_ops() {
         assert_eq!(
-            Float::with_val(PRECISION, 7),
+            7,
             eval(parse_input(&"1+2*3".chars().collect::<Vec<char>>()[..]).unwrap())
         );
 
         assert_eq!(
-            Float::with_val(PRECISION, -1),
+            -1,
             eval(parse_input(&"1*2-3".chars().collect::<Vec<char>>()[..]).unwrap())
         );
 
         assert_eq!(
-            Float::with_val(PRECISION, 9),
+            9,
             eval(parse_input(&"1+2^3".chars().collect::<Vec<char>>()[..]).unwrap())
         );
 
@@ -30,22 +30,22 @@ mod tests {
     #[test]
     fn parenthensis() {
         assert_eq!(
-            Float::with_val(PRECISION, 2),
+            2,
             eval(parse_input(&"(1+1)".chars().collect::<Vec<char>>()[..]).unwrap())
         );
 
         assert_eq!(
-            Float::with_val(PRECISION, 3),
+            3,
             eval(parse_input(&"1+(1+1)".chars().collect::<Vec<char>>()[..]).unwrap())
         );
 
         assert_eq!(
-            Float::with_val(PRECISION, 27),
+            27,
             eval(parse_input(&"(1+2)^3".chars().collect::<Vec<char>>()[..]).unwrap())
         );
 
         assert_eq!(
-            Float::with_val(PRECISION, 3),
+            3,
             eval(parse_input(&"1*(2+1)".chars().collect::<Vec<char>>()[..]).unwrap())
         );
     }
