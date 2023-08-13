@@ -6,20 +6,19 @@ use rug::{ops::Pow, Float};
 const PRECISION: u32 = 20;
 
 fn main() {
-    println!("{}", BiOp::Mul > BiOp::Add);
     loop {
         (|| {
             let stdin = std::io::stdin();
             let mut buffer = String::new();
 
             stdin.read_line(&mut buffer).ok()?;
-            let buffer: Vec<char> = buffer.chars().collect();
+            let chars: Vec<char> = buffer.chars().collect();
 
-            let ops = parse_input(&buffer[..]);
+            let ops = parse_input(&chars[..]);
             println!("Final: {:?}", ops);
 
             let res = eval(ops?);
-            println!("Final res: {}", res);
+            println!("{} = {}", buffer.trim(), res);
             Some(res)
         })();
     }
@@ -171,8 +170,15 @@ fn parse_input(input: &[char]) -> Option<Thing> {
             }
             '(' => {
                 let mut end = i;
-                while input.get(end).is_some_and(|n| *n != ')') {
-                    end += 1;
+                for (pi, c) in input[end..].iter().enumerate() {
+                    if *c == ')' {
+                        end = pi + i;
+                    }
+                }
+
+                if end == i {
+                    println!("Invalid numer of parenthesis");
+                    return None;
                 }
 
                 let rec = &input[i+1..end];
