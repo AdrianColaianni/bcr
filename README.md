@@ -6,7 +6,7 @@ Written not for performace, use, or utility but because I'm bored.
 
 Supports
 - [X] Order of operations
-- [o] Expressions
+- [ ] Expressions
 	- [ ] Variables
 	- [ ] Arrays
 	- [X] Negation
