@@ -1,11 +1,15 @@
 #![feature(exclusive_range_pattern)]
 mod tests;
 
+use std::collections::HashMap;
+
 use rug::{ops::Pow, Float};
 
 const PRECISION: u32 = 20;
 
 fn main() {
+    let mut vars = HashMap::new();
+
     loop {
         (|| {
             let stdin = std::io::stdin();
@@ -14,10 +18,12 @@ fn main() {
             stdin.read_line(&mut buffer).ok()?;
             let chars: Vec<char> = buffer.chars().collect();
 
-            let ops = parse_input(&chars[..]);
+            let ops = parse_input(&chars[..], &mut vars);
             println!("Final: {:?}", ops);
 
-            let res = eval(ops?);
+            println!("Vars are: {:?}", vars);
+
+            let res = eval(ops?, &vars);
             println!("{} = {}", buffer.trim(), res);
             Some(res)
         })();
@@ -27,9 +33,9 @@ fn main() {
 #[derive(Debug, PartialEq)]
 enum Thing {
     BiOp(Box<Thing>, BiOp, Box<Thing>),
-    #[allow(dead_code)]
     UnOp(UnOp, Box<Thing>),
     Operand(Float),
+    Variable(String),
 }
 
 // Lowest to highest expression precedence
@@ -48,12 +54,12 @@ enum BiOp {
     Or,  // ||
     And, // &&
     // Relational Operators
-    Eq,  // ==
-    Ne,  // !=
-    Gt,  // >
-    Ge,  // >=
-    Lt,  // <
-    Le,  // <=
+    Eq, // ==
+    Ne, // !=
+    Gt, // >
+    Ge, // >=
+    Lt, // <
+    Le, // <=
     // Regular Operators
     Add, // +
     Sub, // -
@@ -61,10 +67,10 @@ enum BiOp {
     Div, // /
     Mod, // %
     Pow, // ^
-    // PreInc,
-    // PreDec,
-    // PostInc,
-    // PostDec,
+         // PreInc,
+         // PreDec,
+         // PostInc,
+         // PostDec,
 }
 
 impl std::fmt::Display for BiOp {
@@ -102,7 +108,7 @@ enum UnOp {
     Neg, // -
 }
 
-fn parse_input(input: &[char]) -> Option<Thing> {
+fn parse_input(input: &[char], vars: &mut HashMap<String, Float>) -> Option<Thing> {
     let mut i = 0;
 
     let mut root: Option<Thing> = None;
@@ -171,6 +177,65 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                     panic!("Invalid input: {}", num);
                 }
             }
+            'a'..'z' => {
+                let mut word: String = input[i].into();
+                if let Some(mut n) = input.get(i + 1) {
+                    while *n >= 'z' && *n <= 'a' || *n == '_' {
+                        word.push(*n);
+                        i += 1;
+                        n = match input.get(i + 1) {
+                            Some(n) => n,
+                            None => break,
+                        };
+                    }
+                }
+
+                // todo!("Check keywords");
+
+                if input.get(i + 1).is_some_and(|n| *n == '=') {
+                    i += 2;
+                    let rec = &input[i..];
+                    let thing = parse_input(rec, vars).unwrap();
+
+                    let num = eval(thing, &vars);
+
+                    if let Some(var) = vars.get_mut(&word) {
+                        *var = num;
+                    } else {
+                        vars.insert(word.clone(), num);
+                    }
+
+                    println!("set {} to {}", word, vars.get(&word).unwrap());
+                    return None;
+                } else {
+                    if left.is_none() {
+                        if unop.is_some() {
+                            left = Some(Thing::UnOp(
+                                unop.take().unwrap(),
+                                Box::new(Thing::Variable(word)),
+                            ));
+                        } else {
+                            left = Some(Thing::Variable(word));
+                        }
+                        // println!("Found {}", left.as_ref().unwrap());
+                    } else if right.is_none() {
+                        if unop.is_some() {
+                            right = Some(Thing::UnOp(
+                                unop.take().unwrap(),
+                                Box::new(Thing::Variable(word)),
+                            ));
+                        } else {
+                            right = Some(Thing::Variable(word));
+                        }
+                        // println!("Found {}", right.as_ref().unwrap());
+                    } else {
+                        panic!("Invalid input: {}", word);
+                    }
+                }
+            }
+            'A'..'Z' => {
+                todo!("No funking allowed");
+            }
             '+' => {
                 if input.get(i + 1).is_some_and(|n| *n == '+') {
                     todo!("Pre/Postfix addition");
@@ -216,19 +281,19 @@ fn parse_input(input: &[char]) -> Option<Thing> {
                     if unop.is_some() {
                         left = Some(Thing::UnOp(
                             unop.take().unwrap(),
-                            Box::new(parse_input(rec).unwrap()),
+                            Box::new(parse_input(rec, vars).unwrap()),
                         ));
                     } else {
-                        left = Some(parse_input(rec).unwrap());
+                        left = Some(parse_input(rec, vars).unwrap());
                     }
                 } else if right.is_none() {
                     if unop.is_some() {
                         right = Some(Thing::UnOp(
                             unop.take().unwrap(),
-                            Box::new(parse_input(rec).unwrap()),
+                            Box::new(parse_input(rec, vars).unwrap()),
                         ));
                     } else {
-                        right = Some(parse_input(rec).unwrap());
+                        right = Some(parse_input(rec, vars).unwrap());
                     }
                 } else {
                     panic!("Invalid input 1:{}", i);
@@ -340,8 +405,7 @@ fn add_ops(root: Option<Thing>, left: Option<Thing>, op: BiOp, right: Thing) -> 
                     Thing::BiOp(l, o, Box::new(Thing::BiOp(r, op, Box::new(right))))
                 }
             }
-            Thing::UnOp(..) => todo!(),
-            Thing::Operand(_) => panic!("What the funk"),
+            _ => panic!("Total funkilation"),
         }
     } else if let Some(left) = left {
         Thing::BiOp(Box::new(left), op, Box::new(right))
@@ -354,11 +418,11 @@ fn is_biop(op: char) -> bool {
     "+*/%^<>=".contains(op)
 }
 
-fn eval(op: Thing) -> Float {
+fn eval(op: Thing, vars: &HashMap<String, Float>) -> Float {
     match op {
         Thing::BiOp(l, o, r) => {
-            let l = eval(*l);
-            let r = eval(*r);
+            let l = eval(*l, vars);
+            let r = eval(*r, vars);
             match o {
                 BiOp::Eq => Float::with_val(PRECISION, (l == r) as usize),
                 BiOp::Ne => Float::with_val(PRECISION, (l != r) as usize),
@@ -372,16 +436,15 @@ fn eval(op: Thing) -> Float {
                 BiOp::Sub => l - r,
                 BiOp::Mul => l * r,
                 BiOp::Div => l / r,
-                BiOp::Mod => {
-                    l.clone() - (l / r.clone()) * r
-                }
+                BiOp::Mod => l.clone() - (l / r.clone()) * r,
                 BiOp::Pow => l.pow(r),
-                }
-        },
+            }
+        }
         Thing::UnOp(o, v) => match o {
-            UnOp::Neg => -eval(*v),
-            UnOp::Not => Float::with_val(PRECISION, (eval(*v) == 0) as usize),
+            UnOp::Neg => -eval(*v, vars),
+            UnOp::Not => Float::with_val(PRECISION, (eval(*v, vars) == 0) as usize),
         },
         Thing::Operand(v) => v,
+        Thing::Variable(name) => vars.get(&name).unwrap().clone(),
     }
 }
